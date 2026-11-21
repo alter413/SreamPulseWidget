@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+**/node_modules/
+/publish/
+/SteamPulse/settings.html
+/settings-ui/src/components/
+/settings-ui/src/*.woff2
+*.user

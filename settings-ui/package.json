@@ -1,0 +1,19 @@
+{
+  "name": "steampulse-settings",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "setup": "node setup.mjs"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "motion": "^12.43.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwind-merge": "^3.4.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.0"
+  }
+}
