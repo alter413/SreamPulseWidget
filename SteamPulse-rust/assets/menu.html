@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: https://avatars.akamai.steamstatic.com https://avatars.cloudflare.steamstatic.com https://avatars.fastly.steamstatic.com https://avatars.steamstatic.com; base-uri 'none'; form-action 'none'">
+<title>Steam Pulse</title>
+<style>
+:root { color-scheme:dark; font:12px "Segoe UI", sans-serif; --ink:#eef5ff; --muted:#a5b7cd; --edge:#35485e; --panel:#141e2b; --row:#202f41; --thumb:#677e9b; --rail:#243247; --online:#9ce0b9; }
+:root.light { color-scheme:light; --ink:#162333; --muted:#536174; --edge:#ccd7e6; --panel:#f5f8fc; --row:#e7edf5; --thumb:#8295af; --rail:#dfe7f1; --online:#1b673d; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:var(--panel); }
+#backdrop { display:none; inset:0; width:100%; height:100%; position:fixed; object-fit:fill; pointer-events:none; }
+body.glass #backdrop[src] { display:block; }
+body.glass main { background:color-mix(in srgb,var(--panel) calc(var(--tint) * 100%), transparent); }
+main { position:relative; padding:13px 15px 12px; border:1px solid var(--edge); border-radius:var(--radius,20px); overflow:auto; max-height:100vh; }
+body:not(.revealed) main { visibility:hidden; }
+body.animate main { animation:appear 140ms ease-out both; }
+@keyframes appear { from { opacity:0; } to { opacity:1; } }
+@media (prefers-reduced-motion:reduce) { body.animate main { animation:none; } }
+body.glass main { border-color:color-mix(in srgb,var(--edge),transparent 55%); }
+header { display:flex; justify-content:space-between; align-items:center; padding-inline-start:3px; }
+header strong { font-size:14px; font-weight:600; }
+.action { padding:3px 7px; margin:2px 0; }
+section .action { display:block; width:100%; }
+h2 { margin:6px 0 2px; padding:5px 4px 0; font-size:11px; font-weight:600; color:var(--muted); border-top:1px solid var(--edge); }
+p { color:var(--muted); font-size:11px; line-height:15px; margin:3px 4px 5px; }
+button { border:1px solid var(--edge); border-radius:8px; background:var(--row); color:inherit; font:inherit; }
+button { cursor:pointer; text-align:start; }
+button:hover { background:color-mix(in srgb,var(--row),var(--ink) 12%); }
+button:focus-visible { outline:2px solid #54dafe; outline-offset:-2px; }
+.row { min-height:32px; padding:3px 7px; margin:2px 0; width:100%; display:flex; align-items:center; gap:8px; }
+.label { flex:1; min-width:0; display:grid; }
+.label span, .label small { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+small { color:var(--muted); font-size:11px; }
+img.icon, .icon { width:24px; height:24px; border-radius:5px; object-fit:cover; display:grid; place-items:center; flex:none; }
+.tag { flex:none; }
+.notice-row { display:flex; align-items:center; gap:4px; margin:4px 0; }
+.offer { flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; padding:3px 7px; }
+.hide { flex:none; padding:3px 7px; }
+.list { max-height:210px; overflow:auto; scrollbar-color:var(--thumb) var(--rail); scrollbar-width:thin; }
+.friend { margin:3px 4px; }
+.friend strong, .playing strong { font-size:12px; font-weight:600; }
+.friend-line, .playing { display:flex; justify-content:space-between; align-items:center; gap:6px; }
+.friend-line span, .friend-line strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.friend-line time, .friend-line .presence { flex:none; }
+.online { color:var(--online); }
+.playing { margin:7px 6px 3px 4px; }
+.stack { display:flex; padding-inline-start:5px; }
+.stack .icon { width:27px; height:27px; margin-inline-start:-8px; border:1px solid var(--panel); border-radius:50%; }
+</style>
+</head>
+<body>
+<img id="backdrop" alt="">
+<main></main>
+<script>
+const bridge=window.steamPulseBridge;
+const main=document.querySelector('main');
+const backdrop=document.getElementById('backdrop');
+const emit=(action,id)=>bridge.postMessage({action,id});
+const node=(tag,text,cls)=>{
+  const el=document.createElement(tag);
+  if (text) el.textContent=text;
+  if (cls) el.className=cls;
+  return el;
+};
+function icon(url,fallback) {
+  if (!url) return node('span',fallback,'icon');
+  const img=node('img','','icon');
+  img.src=url;
+  img.alt='';
+  img.addEventListener('error',()=>img.replaceWith(node('span',fallback,'icon')),{once:true});
+  return img;
+}
+function section(title,rows,empty,scroll=false) {
+  if (!rows) return;
+  const group=node('section');
+  group.append(node('h2',title));
+  const list=node('div','',scroll?'list':'');
+  if (rows.length) list.append(...rows);
+  else list.append(node('p',empty));
+  group.append(list);
+  main.append(group);
+}
+function label(title,detail) {
+  const el=node('div','','label');
+  el.append(node('span',title));
+  if (detail) el.append(node('small',detail));
+  return el;
+}
+bridge.addEventListener('message',({data})=>{
+  if (data.type==='reveal') {
+    document.body.classList.toggle('animate',data.animate);
+    document.body.classList.add('revealed');
+    return;
+  }
+  if (data.type==='glass') {
+    if (data.frame) backdrop.src=data.frame;
+    else backdrop.removeAttribute('src');
+    return;
+  }
+  if (data.type!=='menu') return;
+  const scroll=main.querySelector('.list')?.scrollTop||0;
+  const focus=document.activeElement?.dataset?.key;
+  document.documentElement.classList.toggle('light',data.light);
+  document.documentElement.lang=data.language;
+  document.documentElement.dir=data.language==='ar'?'rtl':'ltr';
+  document.body.classList.toggle('glass',data.glass);
+  main.style.setProperty('--radius',data.radius+'px');
+  main.style.setProperty('--tint',data.tint);
+  main.replaceChildren();
+  const header=node('header');
+  const settings=node('button',data.settings,'action');
+  settings.dataset.key='settings';
+  settings.addEventListener('click',()=>emit('settings'));
+  header.append(node('strong','Steam Pulse'),settings);
+  main.append(header);
+  section(data.recentTitle,data.recent?.map(r=>{
+    const button=node('button','','row');
+    button.dataset.key='launch'+r.id;
+    button.append(icon(r.icon,'▶'),label(r.name,r.detail),node('small',r.action,'tag'));
+    button.addEventListener('click',()=>emit('launch',r.id));
+    return button;
+  }),data.recentEmpty);
+  if (data.recent) {
+    const manage=node('button',data.manage,'action');
+    manage.dataset.key='manage';
+    manage.addEventListener('click',()=>emit('manage'));
+    main.lastElementChild.append(manage);
+  }
+  section(data.noticeTitle,data.offers?.map(r=>{
+    const row=node('div','','notice-row');
+    const offer=node('button',r.Name+' · −'+r.Discount+'%','offer');
+    offer.dataset.key='offer'+r.Id;
+    offer.addEventListener('click',()=>emit('offer',r.Id));
+    const hide=node('button',data.hide,'hide');
+    hide.dataset.key='hide'+r.Id;
+    hide.addEventListener('click',()=>emit('hideOffer',r.Id));
+    row.append(offer,hide);
+    return row;
+  }),data.noticeEmpty);
+  function friend(person) {
+    const row=node('div','','friend');
+    const top=node('div','','friend-line');
+    top.append(node('strong',person.name),node('small',person.online?data.online:data.offline,person.online?'presence online':'presence'));
+    const last=node('small','','friend-line');
+    last.append(node('span',person.game));
+    if (person.when) last.append(node('time',person.when));
+    row.append(top,last);
+    return row;
+  }
+  const groups=new Map();
+  for (const person of data.people||[]) {
+    if (!person.playing) continue;
+    const key=person.playing.toLocaleLowerCase();
+    const team=groups.get(key)||[];
+    team.push(person);
+    groups.set(key,team);
+  }
+  const presence=[...groups.values()].flatMap(team=>{
+    const title=node('div','','playing');
+    title.append(node('strong',team[0].playing));
+    if (data.avatars) {
+      const stack=node('div','','stack');
+      stack.append(...team.slice(0,5).map(p=>icon(p.avatar,'●')));
+      title.append(stack);
+    } else {
+      title.append(node('small',team.length>1?'● '+team.length:'●','online'));
+    }
+    return [title,...team.map(friend)];
+  });
+  presence.push(...(data.people||[]).filter(p=>!p.playing).map(friend));
+  section(data.friendsTitle,data.people?presence:null,data.friendsEmpty,true);
+  const list=main.querySelector('.list');
+  if (list) list.scrollTop=scroll;
+  if (focus) [...main.querySelectorAll('button')].find(button=>button.dataset.key===focus)?.focus({preventScroll:true});
+  const height=Math.ceil(main.scrollHeight+2);
+  if (height!==lastHeight) { lastHeight=height; emit('measure',height); }
+});
+let lastHeight=0;
+window.addEventListener('keydown',event=>{ if(event.key==='Escape') emit('close'); });
+emit('ready');
+</script>
+</body>
+</html>

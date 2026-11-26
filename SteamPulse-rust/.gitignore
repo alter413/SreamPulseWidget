@@ -1,0 +1,5 @@
+/target/
+/settings-ui/node_modules/
+/settings-ui/dist/
+/settings-ui/src/components/
+/settings-ui/src/*.woff2

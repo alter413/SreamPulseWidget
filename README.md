@@ -1,5 +1,7 @@
 # Steam Pulse
 
+[Rust 4.8.4 build and installation instructions](SteamPulse-rust/README.md). The original C# source is in the SteamPulse folder.
+
 A Windows x64 tray utility that shows Steam activity in a free space on the taskbar.
 
 ## Run
